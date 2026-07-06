@@ -1,0 +1,589 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#f4c9a1">
+<title>ZipTide ve Altın Fermuar</title>
+<style>
+  :root{
+    --teal:#3fa9a3; --teal-d:#2c7f7a;
+    --pink:#f28c8c; --pink-d:#d96b6b;
+    --gold:#f4b942; --gold-d:#e09a1f;
+    --cream:#fbe9c8; --ink:#3a2b2b;
+    --good:#7ac77a; --sky:#f6d9a8;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color:transparent; margin:0; padding:0}
+  html,body{height:100%}
+  body{
+    font-family:'Comic Sans MS','Baloo 2','Trebuchet MS',system-ui,sans-serif;
+    background:#2c221f; color:var(--ink);
+    overflow:hidden; user-select:none; -webkit-user-select:none;
+    touch-action:manipulation;
+  }
+  #game{
+    position:fixed; inset:0; margin:auto;
+    max-width:min(100vw, calc(100vh * 16 / 10));
+    max-height:min(100vh, calc(100vw * 10 / 16));
+    aspect-ratio:16/10;
+    background:#000; overflow:hidden;
+    box-shadow:0 0 60px rgba(0,0,0,.6);
+  }
+  .scene{
+    position:absolute; inset:0;
+    background-size:cover; background-position:center;
+    opacity:0; visibility:hidden; transition:opacity .6s ease;
+    display:flex; flex-direction:column;
+  }
+  .scene.active{opacity:1; visibility:visible; z-index:2}
+  .scene.desat{filter:grayscale(.75) brightness(.82) contrast(.9); transition:filter 1.2s ease}
+
+  /* Narration card */
+  .narr{
+    position:absolute; left:50%; bottom:3.5%; transform:translateX(-50%);
+    width:min(88%, 720px);
+    background:rgba(255,255,255,.93); backdrop-filter:blur(4px);
+    border:4px solid #fff; border-radius:26px;
+    padding:clamp(10px,2.4vh,20px) clamp(16px,3vw,26px);
+    box-shadow:0 10px 30px rgba(0,0,0,.28);
+    z-index:5; text-align:center;
+  }
+  .narr .badge{
+    position:absolute; top:-18px; left:22px;
+    background:var(--gold); color:#fff; font-weight:bold;
+    padding:4px 16px; border-radius:20px; font-size:clamp(12px,1.9vh,17px);
+    border:3px solid #fff; box-shadow:0 3px 8px rgba(0,0,0,.2);
+  }
+  .narr p{
+    font-size:clamp(15px,2.5vh,23px); line-height:1.32; color:var(--ink);
+    margin:2px 0 8px; font-weight:600;
+  }
+  .narr .row{display:flex; gap:10px; justify-content:center; align-items:center; flex-wrap:wrap}
+  .task{
+    font-size:clamp(13px,2vh,18px); color:var(--teal-d); font-weight:bold;
+    background:#e8f6f5; border-radius:16px; padding:6px 14px; margin-bottom:8px;
+    display:inline-block;
+  }
+  /* Buttons */
+  button{font-family:inherit; cursor:pointer; border:none}
+  .btn{
+    font-size:clamp(15px,2.3vh,21px); font-weight:bold; color:#fff;
+    padding:10px 22px; border-radius:40px; border:3px solid rgba(255,255,255,.8);
+    box-shadow:0 6px 0 rgba(0,0,0,.18), 0 8px 16px rgba(0,0,0,.2);
+    transition:transform .08s, box-shadow .08s; white-space:nowrap;
+  }
+  .btn:active{transform:translateY(4px); box-shadow:0 2px 0 rgba(0,0,0,.18)}
+  .btn.next{background:linear-gradient(#5bc0b9,#3fa9a3)}
+  .btn.listen{background:linear-gradient(#f7c65a,#e09a1f)}
+  .btn.big{background:linear-gradient(#f79b9b,#d96b6b); font-size:clamp(18px,3vh,30px); padding:16px 40px}
+  .btn.disabled{opacity:.45; pointer-events:none; filter:grayscale(.4)}
+
+  /* HUD stars */
+  #hud{
+    position:absolute; top:12px; right:14px; z-index:8;
+    background:rgba(255,255,255,.9); border-radius:30px; padding:5px 14px 5px 10px;
+    display:flex; align-items:center; gap:4px; font-weight:bold;
+    font-size:clamp(15px,2.4vh,22px); color:var(--gold-d);
+    box-shadow:0 4px 12px rgba(0,0,0,.2); border:3px solid #fff;
+  }
+  #hud .s{font-size:clamp(18px,2.8vh,26px); filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
+  #muteBtn{
+    position:absolute; top:12px; left:14px; z-index:8;
+    width:clamp(42px,6vh,54px); height:clamp(42px,6vh,54px); border-radius:50%;
+    background:rgba(255,255,255,.9); border:3px solid #fff; font-size:clamp(20px,3vh,26px);
+    box-shadow:0 4px 12px rgba(0,0,0,.2);
+  }
+
+  /* Tap sparkle layer */
+  .fx{position:absolute; inset:0; pointer-events:none; z-index:6; overflow:hidden}
+  .spark{position:absolute; font-size:34px; animation:pop 1s ease forwards; will-change:transform,opacity}
+  @keyframes pop{0%{transform:scale(.2) translateY(0);opacity:1}100%{transform:scale(1.6) translateY(-60px);opacity:0}}
+
+  /* Tappable hotspots / items */
+  .item{
+    position:absolute; font-size:clamp(34px,7vh,60px); z-index:6;
+    filter:drop-shadow(0 3px 5px rgba(0,0,0,.25)); cursor:pointer;
+    transition:transform .12s;
+    /* büyük, çocuk dostu dokunma alanı */
+    min-width:clamp(64px,11vh,96px); min-height:clamp(64px,11vh,96px);
+    display:flex; align-items:center; justify-content:center; line-height:1;
+  }
+  .item:active{transform:scale(.85)}
+  .bounce{animation:bob 1.8s ease-in-out infinite}
+  @keyframes bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
+  .glow{animation:glow 1.2s ease-in-out infinite}
+  @keyframes glow{0%,100%{filter:drop-shadow(0 0 4px #fff) drop-shadow(0 3px 5px rgba(0,0,0,.25))}
+    50%{filter:drop-shadow(0 0 22px var(--gold)) drop-shadow(0 3px 5px rgba(0,0,0,.25))}}
+
+  /* Progress bar (repair) */
+  .prog{
+    position:absolute; top:14px; left:50%; transform:translateX(-50%);
+    width:min(60%,420px); height:22px; background:rgba(255,255,255,.6);
+    border-radius:20px; border:3px solid #fff; z-index:7; overflow:hidden;
+    box-shadow:0 3px 10px rgba(0,0,0,.2);
+  }
+  .prog>i{display:block; height:100%; width:0%; border-radius:20px;
+    background:linear-gradient(90deg,#f4b942,#f79b9b,#5bc0b9); transition:width .2s}
+
+  /* Zipper repair track */
+  #zipWrap{position:absolute; left:0; right:0; top:52%; height:120px; z-index:4}
+  #zipTrack{
+    position:absolute; left:6%; right:6%; top:50%; transform:translateY(-50%);
+    height:26px; border-radius:14px;
+    background:repeating-linear-gradient(90deg,#e8b34a 0 7px,#f6d68a 7px 14px);
+    box-shadow:inset 0 0 6px rgba(0,0,0,.3);
+  }
+  #zipOpen{
+    position:absolute; top:50%; transform:translateY(-50%); height:34px;
+    border-radius:16px; background:repeating-linear-gradient(90deg,#c85c5c 0 8px,#e88 8px 16px);
+    box-shadow:inset 0 0 8px rgba(0,0,0,.35);
+  }
+  #pull{
+    position:absolute; top:50%; transform:translate(-50%,-50%);
+    width:clamp(58px,9vh,78px); height:clamp(58px,9vh,78px); z-index:6;
+    cursor:grab; touch-action:none; font-size:clamp(34px,6vh,48px);
+    display:flex; align-items:center; justify-content:center;
+    filter:drop-shadow(0 4px 8px rgba(0,0,0,.35));
+    animation:wiggle 1.2s ease-in-out infinite;
+  }
+  #pull:active{cursor:grabbing; animation:none}
+  @keyframes wiggle{0%,100%{margin-top:0}50%{margin-top:-6px}}
+
+  /* Build hero pieces */
+  .piece{position:absolute; z-index:4; font-size:clamp(30px,6vh,52px); cursor:pointer;
+    filter:drop-shadow(0 0 10px var(--gold));}
+
+  /* Big center hero on final */
+  .center-msg{
+    position:absolute; inset:0; display:flex; flex-direction:column;
+    align-items:center; justify-content:center; z-index:6; pointer-events:none;
+  }
+  .center-msg h1{
+    color:#fff; font-size:clamp(30px,7vh,64px);
+    text-shadow:0 4px 0 var(--gold-d), 0 8px 20px rgba(0,0,0,.4);
+    animation:bob 2s ease-in-out infinite;
+  }
+
+  /* Start overlay */
+  #start{
+    position:absolute; inset:0; z-index:20;
+    background:
+      radial-gradient(circle at 50% 30%, rgba(255,255,255,.25), transparent 60%),
+      linear-gradient(#f6d9a8,#f4a9a9);
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    text-align:center; padding:20px;
+  }
+  #start .cover{
+    width:min(70%,520px); border-radius:24px; border:6px solid #fff;
+    box-shadow:0 16px 40px rgba(0,0,0,.35); margin-bottom:min(3vh,20px);
+    background-size:cover; background-position:center; aspect-ratio:16/9;
+  }
+  #start h1{font-size:clamp(26px,6vh,52px); color:#fff;
+    text-shadow:0 3px 0 var(--gold-d),0 6px 14px rgba(0,0,0,.3); line-height:1.05}
+  #start .sub{font-size:clamp(14px,2.4vh,22px); color:var(--ink); font-weight:bold; margin:6px 0 4px}
+  #start .tag{font-size:clamp(11px,1.8vh,15px); color:#7a5c48; margin-bottom:min(3vh,18px)}
+
+  .heartFloat{position:absolute;font-size:30px;animation:heart 1.4s ease forwards;pointer-events:none;z-index:6}
+  @keyframes heart{0%{transform:translateY(0) scale(.4);opacity:1}100%{transform:translateY(-90px) scale(1.3);opacity:0}}
+  .confetti{position:absolute;top:-20px;width:12px;height:16px;border-radius:3px;z-index:9;pointer-events:none}
+  @media (max-height:430px){
+    .narr{bottom:2%; padding:8px 16px; max-width:82%}
+    .narr p{font-size:15px; line-height:1.22; margin:2px 0 6px}
+    .narr .task{font-size:12px; padding:4px 10px; margin-bottom:5px}
+    .btn{padding:7px 16px; font-size:15px}
+  }
+</style>
+</head>
+<body>
+<div id="game">
+  <button id="muteBtn" aria-label="Ses">🔊</button>
+  <div id="hud"><span class="s">⭐</span><span id="starCount">0</span></div>
+
+  <!-- SCENES injected by JS -->
+  <div id="scenes"></div>
+  <div class="fx" id="fx"></div>
+
+  <!-- START -->
+  <div id="start">
+    <div class="cover" style="background-image:url('img/cover.jpg')"></div>
+    <h1>ZipTide<br>ve Altın Fermuar</h1>
+    <div class="sub">Küçük Bekçilerin Masalı 🌟</div>
+    <div class="tag">GİKAL iGEM 2026 • 5–6 yaş için oyun</div>
+    <button class="btn big" id="startBtn">▶ Başla</button>
+  </div>
+</div>
+
+<script>
+/* ============ SES ============ */
+let muted=false, ac=null;
+function actx(){ if(!ac){ try{ac=new (window.AudioContext||window.webkitAudioContext)();}catch(e){} } return ac; }
+function beep(freq=440,dur=.15,type='sine',vol=.2){
+  if(muted) return; const c=actx(); if(!c) return;
+  const o=c.createOscillator(), g=c.createGain();
+  o.type=type; o.frequency.value=freq; o.connect(g); g.connect(c.destination);
+  g.gain.setValueAtTime(0,c.currentTime);
+  g.gain.linearRampToValueAtTime(vol,c.currentTime+.02);
+  g.gain.exponentialRampToValueAtTime(.0001,c.currentTime+dur);
+  o.start(); o.stop(c.currentTime+dur);
+}
+function chime(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,.22,'triangle',.22),i*90)); }
+function sadTone(){ [400,340,280].forEach((f,i)=>setTimeout(()=>beep(f,.25,'sine',.18),i*140)); }
+function zipTick(){ beep(220+Math.random()*120,.05,'square',.12); }
+function tada(){ [523,659,784,1046,1318].forEach((f,i)=>setTimeout(()=>beep(f,.3,'triangle',.24),i*110)); }
+
+/* ============ ANLATIM (okuma) ============ */
+let ttsOn=true, voices=[];
+function loadVoices(){ voices=speechSynthesis.getVoices(); }
+if('speechSynthesis' in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
+function speak(text){
+  if(muted||!ttsOn||!('speechSynthesis' in window)) return;
+  speechSynthesis.cancel();
+  const u=new SpeechSynthesisUtterance(text);
+  u.lang='tr-TR'; u.rate=.92; u.pitch=1.08;
+  const tr=voices.find(v=>/tr/i.test(v.lang)); if(tr)u.voice=tr;
+  speechSynthesis.speak(u);
+}
+function stopSpeak(){ if('speechSynthesis' in window) speechSynthesis.cancel(); }
+
+/* ============ DURUM ============ */
+let stars=0;
+function addStar(n=1){ stars+=n; document.getElementById('starCount').textContent=stars; beep(880,.12,'triangle',.2); }
+
+function sparkleAt(x,y,emoji='✨'){
+  const fx=document.getElementById('fx');
+  const s=document.createElement('div'); s.className='spark'; s.textContent=emoji;
+  s.style.left=(x-17)+'px'; s.style.top=(y-17)+'px';
+  fx.appendChild(s); setTimeout(()=>s.remove(),1000);
+}
+function relXY(e,host){
+  const r=host.getBoundingClientRect();
+  const p=e.touches?e.touches[0]:e;
+  return {x:p.clientX-r.left, y:p.clientY-r.top};
+}
+/* Küçük çocuklar için: bası bırakmayı beklemeden pointerdown'da tepki ver
+   (zıplayan hedeflerde 'click' kaçabiliyor). Çift tetiklemeyi engelle. */
+function tap(el,fn){
+  let used=false;
+  const h=(e)=>{ if(used)return; used=true; e.preventDefault&&e.preventDefault(); fn(e); };
+  el.addEventListener('pointerdown',h);
+  el.addEventListener('click',h);
+}
+
+/* ============ SAHNELER ============ */
+const scenesData=[
+  {n:1,img:'scene1',badge:'1 • Huzurlu Dünya',
+   text:'Küçük bir dünyanın kıyısında minik bekçiler yaşarmış. Yan yana dizilir, birbirlerine sımsıkı tutunurlarmış. Aralarından altın bir fermuar geçermiş.',
+   task:'👆 Bekçilere dokun, seni selamlasınlar!'},
+  {n:2,img:'scene2',badge:'2 • Bekçilerin Görevi',
+   text:'Bekçiler fermuarı tam gerektiği kadar aralarmış. İçeri yalnızca güzel şeyler girsin istermiş: serin su damlaları, minik yiyecek kırıntıları.',
+   task:'💧 Güzel şeylere dokun, içeri alalım! (Kara şeylere dokunma)'},
+  {n:3,img:'scene3',badge:'3 • Meraklı Zonulin',
+   text:'Bir gün Zonulin gelmiş. Kötü niyetli değilmiş, sadece meraklıymış. "Şu fermuarı birazcık daha çeksem?" demiş ve fermuarı aralamaya başlamış.',
+   task:'👆 Zonulin bulutuna dokun bakalım ne yapıyor!'},
+  {n:4,img:'scene4',badge:'4 • Karışan Düzen',
+   text:'Fermuar açılınca kara şeyler içeri doluvermiş. Dünyanın renkleri solmuş. Bekçiler çok üzülmüş: "Keşke bize yardım edecek biri olsa!"',
+   task:'❤️ Üzgün bekçilere dokun, onları sev!'},
+  {n:5,img:'scene5',badge:'5 • Bir Kahraman Doğuyor',
+   text:'Uzak bir atölyede ışıktan eller sabırla küçük bir kahraman yapıyormuş. Tam o fermuarı onarabilsin diye. Adını ZipTide koymuşlar.',
+   task:'✨ Parlayan parçalara dokun, kahramanı tamamla!'},
+  {n:6,img:'scene6',badge:'6 • Yardım Yetişiyor',
+   text:'ZipTide hemen yola koyulmuş. Bir elinde küçük fermuar çekmesi, yüzünde tatlı bir gülümseme varmış. Hava ısınmış, karanlık dağılmaya başlamış.',
+   task:'👋 ZipTide\'a dokun, merhaba de!'},
+  {n:7,img:'scene7',badge:'7 • Usul Usul Onarım',
+   text:'ZipTide kavga etmemiş. Usulca eğilmiş, fermuarı yavaş yavaş kapatmış; diş diş, sabırla. Onarmak, yıkmaktan çok daha güçlüymüş!',
+   task:'✋ Altın çekmeyi tut ve SAĞA sürükle — fermuarı kapat!'},
+  {n:8,img:'scene8',badge:'8 • Yeniden Huzur',
+   text:'Küçük dünya yeniden aydınlanmış. Fermuar baştan sona kapanmış, içeri gene yalnızca güzel şeyler süzülüyormuş. Her yeri tatlı bir huzur kaplamış.',
+   task:'🎉 Aferin sana! Küçük bir bekçi kahraman oldun!'},
+];
+
+let cur=0; const scenesEl=document.getElementById('scenes'); const sceneNodes=[];
+
+function buildScene(d){
+  const s=document.createElement('div');
+  s.className='scene'; s.style.backgroundImage=`url('img/${d.img}.jpg')`;
+  s.dataset.n=d.n;
+  const narr=document.createElement('div'); narr.className='narr';
+  narr.innerHTML=`<div class="badge">${d.badge}</div>
+    <div class="task">${d.task}</div>
+    <p>${d.text}</p>
+    <div class="row">
+      <button class="btn listen">🔊 Dinle</button>
+      <button class="btn next disabled">İleri ▶</button>
+    </div>`;
+  s.appendChild(narr);
+  narr.querySelector('.listen').onclick=()=>{beep(660,.1);speak(d.task.replace(/[^\wğüşıöçĞÜŞİÖÇ\s!?.,']/g,'')+' '+d.text);};
+  narr.querySelector('.next').onclick=()=>{beep(720,.12,'triangle');go(cur+1);};
+  scenesEl.appendChild(s); sceneNodes.push(s);
+  return s;
+}
+scenesData.forEach(buildScene);
+
+function enableNext(sn){ const b=sn.querySelector('.next'); b.classList.remove('disabled'); b.style.animation='glow 1s ease-in-out infinite'; }
+
+function go(i){
+  stopSpeak();
+  if(i>=scenesData.length){ finale(); return; }
+  sceneNodes.forEach(n=>n.classList.remove('active'));
+  const sn=sceneNodes[i]; sn.classList.add('active'); cur=i;
+  const d=scenesData[i];
+  setTimeout(()=>speak(d.text),450);
+  initInteraction(i,sn);
+}
+
+/* ============ SAHNE ETKİLEŞİMLERİ ============ */
+function clearLayer(sn){ sn.querySelectorAll('.item,.piece,#zipWrap,.prog').forEach(e=>e.remove()); }
+
+function initInteraction(i,sn){
+  if(sn.dataset.done==='1' && i!==6){ enableNext(sn); }
+  clearLayer(sn);
+  const n=scenesData[i].n;
+  if(n===1) sceneTap(sn,['😊','🌸','💚'],3,['👋','😄','🌟']);
+  else if(n===2) sceneSort(sn);
+  else if(n===3) sceneTap(sn,['☁️'],3,['🌫️','😮','💨'],true);
+  else if(n===4) sceneComfort(sn);
+  else if(n===5) sceneBuild(sn);
+  else if(n===6) sceneTap(sn,['🤝','💧','😊'],3,['👋','💙','✨']);
+  else if(n===7) sceneRepair(sn);
+  else if(n===8){ sn.dataset.done='1'; enableNext(sn); celebrate(sn); }
+}
+
+/* Basit dokunma: sahnenin farklı yerlerine emoji koy, hepsine dokununca ileri açılır */
+function sceneTap(sn,emojis,count,rewards,desatEffect){
+  const spots=[[18,30],[40,37],[62,30],[80,38],[30,44]];
+  let left=count;
+  for(let k=0;k<count;k++){
+    const it=document.createElement('div'); it.className='item bounce glow';
+    it.textContent=emojis[k%emojis.length];
+    it.style.left=spots[k][0]+'%'; it.style.top=spots[k][1]+'%';
+    tap(it,(e)=>{
+      beep(700+k*90,.14,'triangle');
+      const p=relXY(e,document.getElementById('game'));
+      sparkleAt(p.x,p.y,rewards[k%rewards.length]);
+      it.style.transition='transform .3s,opacity .3s'; it.style.transform='scale(1.8)'; it.style.opacity='0';
+      setTimeout(()=>it.remove(),300);
+      if(desatEffect && left===count){ sn.classList.add('desat'); }
+      left--; if(left<=0){ addStar(); sn.dataset.done='1'; enableNext(sn); chime(); }
+    });
+    sn.appendChild(it);
+  }
+}
+
+/* Sahne 2: iyi şeyleri topla, kötüye dokunma */
+function sceneSort(sn){
+  const good=['💧','🍞','🍎','🫐','🥕']; const bad=['🦠','💩','🌫️'];
+  let collected=0, need=4, alive=true;
+  const goalNode=document.createElement('div'); goalNode.className='item'; goalNode.style.cssText='left:50%;top:16%;transform:translateX(-50%);font-size:clamp(14px,2.4vh,20px);background:rgba(255,255,255,.9);padding:6px 14px;border-radius:16px;font-weight:bold;color:var(--teal-d);cursor:default;z-index:7';
+  const upd=()=>goalNode.textContent=`💧 Güzel şeyler: ${collected}/${need}`;
+  upd(); sn.appendChild(goalNode);
+  const spawn=()=>{
+    if(!alive) return;
+    const isGood=Math.random()<.62;
+    const it=document.createElement('div'); it.className='item';
+    it.textContent=isGood?good[Math.random()*good.length|0]:bad[Math.random()*bad.length|0];
+    const x=8+Math.random()*80; it.style.left=x+'%'; it.style.top='-12%';
+    it.style.zIndex=4; sn.appendChild(it);
+    let y=-12; const vy=.45+Math.random()*.35;
+    const fall=setInterval(()=>{
+      if(!alive){clearInterval(fall);it.remove();return;}
+      y+=vy; it.style.top=y+'%';
+      if(y>108){clearInterval(fall);it.remove();}
+    },30);
+    tap(it,(e)=>{
+      clearInterval(fall);
+      const p=relXY(e,document.getElementById('game'));
+      if(isGood){
+        beep(760,.14,'triangle'); sparkleAt(p.x,p.y,'✨');
+        it.style.transition='transform .3s,opacity .3s';it.style.transform='scale(0) translateY(-40px)';it.style.opacity=0;
+        collected++; upd();
+        if(collected>=need){ alive=false; addStar(); sn.dataset.done='1'; enableNext(sn); chime();
+          goalNode.textContent='💚 Harika! Hepsini aldın!'; }
+      }else{
+        beep(160,.2,'sawtooth',.18); sparkleAt(p.x,p.y,'🚫');
+        it.style.transition='transform .25s,opacity .25s';it.style.transform='rotate(20deg)';it.style.opacity=0;
+      }
+      setTimeout(()=>it.remove(),320);
+    });
+  };
+  const iv=setInterval(()=>{ if(!alive){clearInterval(iv);return;} spawn(); },780);
+  sn._cleanup=()=>{alive=false;clearInterval(iv);};
+}
+
+/* Sahne 4: üzgün bekçileri sev */
+function sceneComfort(sn){
+  sn.classList.add('desat');
+  const spots=[[20,34],[42,42],[64,34],[82,42]];
+  let left=spots.length;
+  spots.forEach((sp,k)=>{
+    const it=document.createElement('div'); it.className='item bounce'; it.textContent='😢';
+    it.style.left=sp[0]+'%'; it.style.top=sp[1]+'%';
+    tap(it,(e)=>{
+      beep(520+k*60,.16,'sine'); const g=document.getElementById('game'); const p=relXY(e,g);
+      const h=document.createElement('div'); h.className='heartFloat'; h.textContent='❤️';
+      h.style.left=(p.x-15)+'px'; h.style.top=(p.y-15)+'px';
+      document.getElementById('fx').appendChild(h); setTimeout(()=>h.remove(),1400);
+      it.textContent='🙂'; it.classList.remove('bounce'); it.style.pointerEvents='none';
+      left--; if(left<=0){ addStar(); sn.dataset.done='1'; enableNext(sn); sadTone(); }
+    });
+    sn.appendChild(it);
+  });
+}
+
+/* Sahne 5: kahramanı inşa et */
+function sceneBuild(sn){
+  const pieces=['🧩','⚙️','💡','🔧'];
+  const spots=[[26,28],[54,25],[40,44],[72,40]];
+  let left=pieces.length;
+  pieces.forEach((pc,k)=>{
+    const it=document.createElement('div'); it.className='piece glow'; it.textContent=pc;
+    it.style.left=spots[k][0]+'%'; it.style.top=spots[k][1]+'%';
+    tap(it,(e)=>{
+      beep(500+k*130,.16,'triangle'); const p=relXY(e,document.getElementById('game')); sparkleAt(p.x,p.y,'⭐');
+      it.style.transition='transform .3s,opacity .3s'; it.style.transform='scale(0)'; it.style.opacity=0;
+      setTimeout(()=>it.remove(),300);
+      left--; if(left<=0){
+        const hero=document.createElement('div'); hero.className='piece bounce';
+        hero.textContent='🦸'; hero.style.cssText='left:50%;top:44%;transform:translateX(-50%);font-size:clamp(50px,11vh,90px);filter:drop-shadow(0 0 20px var(--teal));z-index:5';
+        sn.appendChild(hero); addStar(); sn.dataset.done='1'; enableNext(sn); chime();
+      }
+    });
+    sn.appendChild(it);
+  });
+}
+
+/* Sahne 7: ANA OYUN — fermuarı sürükle-kapat */
+function sceneRepair(sn){
+  const wrap=document.createElement('div'); wrap.id='zipWrap';
+  wrap.innerHTML=`<div id="zipTrack"></div><div id="zipOpen"></div><div id="pull">🔽</div>`;
+  sn.appendChild(wrap);
+  const prog=document.createElement('div'); prog.className='prog'; prog.innerHTML='<i></i>'; sn.appendChild(prog);
+  const bar=prog.querySelector('i');
+
+  // kötü mikroplar üstte
+  const germs=[]; const gEm=['🦠','🌫️','💩','🦠'];
+  for(let k=0;k<6;k++){
+    const g=document.createElement('div'); g.className='item bounce'; g.style.pointerEvents='none';
+    g.textContent=gEm[k%gEm.length]; g.style.left=(12+k*13)+'%'; g.style.top=(30+ (k%2)*8)+'%';
+    g.style.fontSize='clamp(26px,5vh,44px)'; g.style.zIndex=3; sn.appendChild(g); germs.push(g);
+  }
+
+  const track=wrap.querySelector('#zipTrack');
+  const open=wrap.querySelector('#zipOpen');
+  const pull=wrap.querySelector('#pull');
+  let progress=0, dragging=false;
+
+  function layout(){
+    const w=sn.getBoundingClientRect();
+    const tL=w.width*0.06, tR=w.width*0.94, tW=tR-tL;
+    return {tL,tR,tW};
+  }
+  function render(){
+    const {tL,tW}=layout();
+    const px=tL+tW*(progress/100);
+    pull.style.left=px+'px'; pull.style.top='50%';
+    // açık (kırmızı) kısım pull'un sağında
+    open.style.left=px+'px'; open.style.right=(6)+'%';
+    open.style.width='auto';
+    const openW=Math.max(0,(layout().tR-px));
+    open.style.width=openW+'px';
+    open.style.display= progress>=99?'none':'block';
+    bar.style.width=progress+'%';
+    // mikropları temizle
+    germs.forEach((g,idx)=>{
+      const gx=(12+idx*13);
+      if(progress> (gx-4) && g.dataset.gone!=='1'){
+        g.dataset.gone='1'; g.style.transition='transform .4s,opacity .4s';
+        g.style.transform='translateY(-40px) scale(1.6)'; g.style.opacity='0';
+        beep(900,.1,'triangle'); sparkleAtPct(sn,gx,34,'✨');
+      }
+    });
+  }
+  function setProgFromX(clientX){
+    const {tL,tW}=layout();
+    let p=((clientX-sn.getBoundingClientRect().left)-tL)/tW*100;
+    p=Math.max(0,Math.min(100,p));
+    if(p>progress){ // sadece ileri (kapatma) sayılır
+      if(Math.floor(p/4)!==Math.floor(progress/4)){ zipTick(); }
+      progress=p; render();
+      if(progress>=99){ finishRepair(sn); }
+    }
+  }
+  function down(e){ dragging=true; pull.style.animation='none'; e.preventDefault?.(); }
+  function move(e){ if(!dragging)return; const cx=(e.touches?e.touches[0]:e).clientX; setProgFromX(cx); }
+  function up(){ dragging=false; }
+  pull.addEventListener('mousedown',down); pull.addEventListener('touchstart',down,{passive:false});
+  window.addEventListener('mousemove',move); window.addEventListener('touchmove',move,{passive:false});
+  window.addEventListener('mouseup',up); window.addEventListener('touchend',up);
+  sn._cleanup=()=>{ window.removeEventListener('mousemove',move); window.removeEventListener('touchmove',move);
+    window.removeEventListener('mouseup',up); window.removeEventListener('touchend',up); };
+  render();
+
+  function finishRepair(sn){
+    if(sn.dataset.done==='1')return;
+    sn.dataset.done='1'; addStar(2); chime();
+    open.style.display='none';
+    const msg=document.createElement('div'); msg.className='center-msg';
+    msg.innerHTML='<h1>Fermuar kapandı! 🎉</h1>'; sn.appendChild(msg);
+    enableNext(sn);
+    burstConfetti(sn,30);
+  }
+}
+function sparkleAtPct(sn,xp,yp,em){
+  const r=sn.getBoundingClientRect(); const g=document.getElementById('game').getBoundingClientRect();
+  sparkleAt(r.left-g.left+r.width*xp/100, r.top-g.top+r.height*yp/100, em);
+}
+
+/* ============ KUTLAMA / FINAL ============ */
+function celebrate(sn){
+  tada(); burstConfetti(sn,50);
+  const msg=document.createElement('div'); msg.className='center-msg';
+  msg.innerHTML=`<h1>🌟 Aferin! 🌟</h1>`;
+  msg.style.top='6%'; msg.style.justifyContent='flex-start'; msg.style.paddingTop='6%';
+  sn.appendChild(msg);
+  // replay button — anlatım kartındaki buton satırına ekle (metni örtmesin)
+  const nb=sn.querySelector('.next'); if(nb) nb.style.display='none';
+  const row=sn.querySelector('.narr .row');
+  if(row && !row.querySelector('.replay')){
+    const rp=document.createElement('button'); rp.className='btn next replay'; rp.textContent='🔄 Yeniden Oyna';
+    rp.style.animation='glow 1s ease-in-out infinite';
+    rp.onclick=()=>{ location.reload(); };
+    row.appendChild(rp);
+  }
+}
+function burstConfetti(sn,count){
+  const colors=['#f4b942','#f28c8c','#3fa9a3','#7ac77a','#c78ad6','#ffffff'];
+  for(let i=0;i<count;i++){
+    const c=document.createElement('div'); c.className='confetti';
+    c.style.left=Math.random()*100+'%'; c.style.background=colors[i%colors.length];
+    c.style.transform=`rotate(${Math.random()*360}deg)`;
+    sn.appendChild(c);
+    const dur=1400+Math.random()*1400, sway=(Math.random()*2-1)*80;
+    c.animate([{transform:`translate(0,0) rotate(0)`,opacity:1},
+      {transform:`translate(${sway}px,${sn.clientHeight+40}px) rotate(${Math.random()*720}deg)`,opacity:.9}],
+      {duration:dur,easing:'ease-in'});
+    setTimeout(()=>c.remove(),dur);
+  }
+}
+function finale(){ /* son sahne zaten 8; buraya düşerse başa dön */ }
+
+/* önceki sahne temizliği */
+const _go=go;
+go=function(i){ const prev=sceneNodes[cur]; if(prev&&prev._cleanup){prev._cleanup();prev._cleanup=null;} _go(i); };
+
+/* ============ BAŞLAT ============ */
+document.getElementById('startBtn').onclick=()=>{
+  actx(); if(ac&&ac.state==='suspended')ac.resume();
+  document.getElementById('start').style.transition='opacity .5s';
+  document.getElementById('start').style.opacity='0';
+  setTimeout(()=>{document.getElementById('start').style.display='none';},500);
+  chime(); go(0);
+};
+document.getElementById('muteBtn').onclick=function(){
+  muted=!muted; ttsOn=!muted; this.textContent=muted?'🔇':'🔊';
+  if(muted)stopSpeak(); else beep(660,.12);
+};
+// ekran döndürme / boyut değişince fermuar yeniden çizilsin
+window.addEventListener('resize',()=>{ const sn=sceneNodes[cur]; if(sn&&sn.querySelector('#pull')){ /* render tekrar */ } });
+</script>
+</body>
+</html>
