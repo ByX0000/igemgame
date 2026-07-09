@@ -1,0 +1,120 @@
+<!-- =========================================================================
+     ZipTide — Education page section (ready to paste into your iGEM wiki)
+     - Self-contained: inline styles only, NO external links/fonts/scripts.
+     - Replace GAME_URL below with the relative path to the game file you
+       uploaded to your OWN wiki space (e.g. static/ziptide-game.html).
+     - Fill in every <!-- TODO --> with your team's real information.
+       The judged parts of an Education project are the learning design and,
+       above all, the EVALUATION (real use with real learners) — do not leave
+       those generic.
+     ========================================================================= -->
+<section class="ziptide-edu">
+  <style>
+    .ziptide-edu{--teal:#3fa9a3;--teal-d:#2b7a75;--gold:#e6a92c;--coral:#e8776f;
+      --ink:#4a3b34;--cream:#fdf6ec;--line:#efe2d0;
+      max-width:920px;margin:0 auto;padding:8px 4px 40px;color:var(--ink);
+      font-family:'Trebuchet MS',system-ui,sans-serif;line-height:1.6;}
+    .ziptide-edu h2{font-size:clamp(24px,4vw,34px);color:var(--teal-d);margin:.6em 0 .1em;line-height:1.15;}
+    .ziptide-edu .lede{font-size:clamp(16px,2.4vw,19px);color:#6b574c;margin:.2em 0 1.2em;}
+    .ziptide-edu h3{font-size:clamp(18px,2.6vw,22px);color:var(--coral);margin:1.6em 0 .3em;}
+    .ziptide-edu .frame{background:#fdeede;border-radius:16px;box-shadow:0 8px 30px rgba(0,0,0,.14);
+      overflow:hidden;margin:18px 0;}
+    .ziptide-edu iframe{display:block;width:100%;aspect-ratio:16/10;border:0;background:#fdeede;}
+    .ziptide-edu .full{display:inline-block;margin:8px 0 4px;font-weight:bold;color:var(--teal-d);
+      text-decoration:none;border-bottom:2px solid var(--gold);}
+    .ziptide-edu .tag{display:inline-block;background:var(--teal);color:#fff;border-radius:20px;
+      padding:3px 12px;font-size:13px;font-weight:bold;margin:2px 4px 2px 0;letter-spacing:.3px;}
+    .ziptide-edu table{width:100%;border-collapse:collapse;margin:.6em 0;font-size:15px;}
+    .ziptide-edu th,.ziptide-edu td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top;}
+    .ziptide-edu th{color:var(--teal-d);white-space:nowrap;}
+    .ziptide-edu ul{margin:.3em 0 .8em;padding-left:1.2em;}
+    .ziptide-edu li{margin:.25em 0;}
+    .ziptide-edu .todo{background:#fff7e6;border:1px dashed var(--gold);border-radius:12px;
+      padding:12px 16px;margin:.6em 0;font-size:15px;}
+    .ziptide-edu .todo b{color:#a9781a;}
+    .ziptide-edu .credits{margin-top:1.6em;font-size:14px;color:#7a675c;border-top:1px solid var(--line);padding-top:12px;}
+  </style>
+
+  <h2>ZipTide &amp; the Golden Zipper — a story game for young learners</h2>
+  <p class="lede">A free, bilingual (English&nbsp;/&nbsp;Turkish), voice-narrated browser game that
+  teaches children aged 5&ndash;6 the central idea behind our project: the gut has a protective
+  barrier that must stay <em>just closed enough</em> — and when it loosens, it can be gently
+  repaired. No reading required: every scene is read aloud.</p>
+
+  <span class="tag">Ages 5&ndash;6</span>
+  <span class="tag">Bilingual EN / TR</span>
+  <span class="tag">Voice-narrated</span>
+  <span class="tag">Runs offline</span>
+  <span class="tag">Open source</span>
+
+  <!-- ===== The game (same-origin embed; not an external link) ===== -->
+  <div class="frame">
+    <iframe src="GAME_URL"
+            title="ZipTide and the Golden Zipper — interactive game"
+            allow="autoplay" loading="lazy"></iframe>
+  </div>
+  <a class="full" href="GAME_URL" target="_blank" rel="noopener">Open the game full screen &rarr;</a>
+
+  <!-- ===== Why we built it ===== -->
+  <h3>Why we made it</h3>
+  <p>Explaining a computationally designed peptide and intestinal barrier biology to a preschooler
+  is hard — so we turned our science into a fairy tale. Children meet the tiny guards who hold a
+  golden zipper closed, watch a curious visitor loosen it, and then help our hero close it again,
+  tooth by tooth. Playing it, a five-year-old rehearses the exact logic of our project without a
+  single technical word.</p>
+
+  <!-- ===== Learning objectives ===== -->
+  <h3>Learning objectives</h3>
+  <p>After playing, a child can:</p>
+  <ul>
+    <li>recognise that the body has a <strong>protective barrier</strong> that keeps it safe;</li>
+    <li>explain that the barrier should let <strong>good things in and keep harmful things out</strong>;</li>
+    <li>understand that the barrier can be <strong>loosened</strong>, and that it can be <strong>repaired</strong>;</li>
+    <li>take away a gentle value: <strong>mending is stronger than breaking</strong>.</li>
+  </ul>
+
+  <!-- ===== The science behind the story ===== -->
+  <h3>The science behind the story</h3>
+  <p>Every character maps to a real part of our project, so the game is a first step on a ladder
+  that older students and parents can climb via the note below.</p>
+  <table>
+    <tr><th>In the story</th><th>In real biology / our project</th></tr>
+    <tr><td>The little guards holding hands</td><td>Intestinal epithelial cells joined by <strong>tight junctions</strong></td></tr>
+    <tr><td>The golden zipper</td><td>The gut <strong>barrier</strong> — the tight-junction seal that holds the wall together</td></tr>
+    <tr><td>Letting in water drops &amp; crumbs</td><td><strong>Selective permeability</strong>: nutrients pass, harmful things are kept out</td></tr>
+    <tr><td>Curious Zonulin opening the zipper</td><td><strong>Zonulin</strong>, a real protein that loosens tight junctions and increases permeability (a &ldquo;leaky&rdquo; barrier)</td></tr>
+    <tr><td>The hero ZipTide</td><td><strong>ZipTide</strong>, the peptide we designed <em>in silico</em> to help restore barrier integrity</td></tr>
+    <tr><td>Closing the zipper, tooth by tooth</td><td>Re-establishing the barrier so the tissue is protected again</td></tr>
+  </table>
+
+  <!-- ===== How we used it (EVALUATION — the part judges weigh most) ===== -->
+  <h3>How we used it &amp; what we learned</h3>
+  <div class="todo">
+    <b>TODO — fill this in with your real activity (this is the highest-value part for the
+    Education award).</b> Describe where and with whom you actually ran the game, e.g.:
+    <ul>
+      <li>Setting &amp; audience: <!-- e.g. a kindergarten class in Bilecik, 18 children aged 5–6, on 12 May 2026 --></li>
+      <li>What you did: <!-- how you introduced it, how long, teacher/parent involvement --></li>
+      <li>What you observed / measured: <!-- children's reactions, a simple before/after question, teacher feedback --></li>
+      <li>What you changed as a result: <!-- e.g. added Turkish audio, simplified a scene, slowed narration --></li>
+    </ul>
+    Even a small, honest evaluation with a few learners scores far better than none.
+  </div>
+
+  <!-- ===== Design for young children ===== -->
+  <h3>Designed for young children &amp; for reuse</h3>
+  <ul>
+    <li><strong>Pre-reader friendly:</strong> every scene is narrated aloud by one of our students, so children who cannot yet read can play independently.</li>
+    <li><strong>Bilingual:</strong> a one-tap language switch (English&nbsp;/&nbsp;Turkish) with matching text and audio, widening the audience.</li>
+    <li><strong>Simple &amp; safe:</strong> one clear tap-or-drag action per scene, large touch targets, no text input, no accounts, and no data collection.</li>
+    <li><strong>Accessible &amp; robust:</strong> works on phones, tablets and computers, runs fully offline, and falls back to device text-to-speech if a clip cannot load.</li>
+    <li><strong>Open &amp; reusable:</strong> a single self-contained file released open-source, so any educator or iGEM team can host it, embed it, or run it from a USB stick with no setup.</li>
+  </ul>
+
+  <!-- ===== Credits ===== -->
+  <p class="credits">
+    Story, illustrations and narration created by our team student <!-- TODO: name, e.g. Alya --> ·
+    Built as a free educational resource by <!-- TODO: team name, e.g. GİKAL iGEM 2026 --> ·
+    Source code: <a href="https://github.com/ByX0000/igemgame" target="_blank" rel="noopener">github.com/ByX0000/igemgame</a>
+  </p>
+</section>
