@@ -87,12 +87,20 @@
     box-shadow:0 4px 12px rgba(0,0,0,.2); border:3px solid #fff;
   }
   #hud .s{font-size:clamp(18px,2.8vh,26px); filter:drop-shadow(0 1px 2px rgba(0,0,0,.15))}
+  #topBtns{ position:absolute; top:12px; left:14px; z-index:9; display:flex; gap:8px; align-items:center; }
   #muteBtn{
-    position:absolute; top:12px; left:14px; z-index:8;
     width:clamp(42px,6vh,54px); height:clamp(42px,6vh,54px); border-radius:50%;
     background:rgba(255,255,255,.9); border:3px solid #fff; font-size:clamp(20px,3vh,26px);
     box-shadow:0 4px 12px rgba(0,0,0,.2);
   }
+  #langBtn{
+    height:clamp(42px,6vh,54px); padding:0 14px; border-radius:30px;
+    background:rgba(255,255,255,.9); border:3px solid #fff;
+    font-size:clamp(14px,2.2vh,18px); font-weight:bold; color:var(--teal-d);
+    box-shadow:0 4px 12px rgba(0,0,0,.2); letter-spacing:.3px;
+  }
+  #muteBtn,#langBtn{cursor:pointer; transition:transform .12s}
+  #muteBtn:active,#langBtn:active{transform:scale(.92)}
 
   /* Tap sparkle layer */
   .fx{position:absolute; inset:0; pointer-events:none; z-index:6; overflow:hidden}
@@ -196,7 +204,10 @@
 </head>
 <body>
 <div id="game">
-  <button id="muteBtn" aria-label="Ses">🔊</button>
+  <div id="topBtns">
+    <button id="langBtn" aria-label="Language / Dil">🇹🇷 TR</button>
+    <button id="muteBtn" aria-label="Sound / Ses">🔊</button>
+  </div>
   <div id="hud"><span class="s">⭐</span><span id="starCount">0</span></div>
 
   <!-- SCENES injected by JS -->
@@ -206,9 +217,9 @@
   <!-- START -->
   <div id="start">
     <div class="cover" style="background-image:url('img/cover.jpg')"></div>
-    <h1>ZipTide<br>and the Golden Zipper</h1>
-    <div class="sub">A Tale of the Little Guardians 🌟</div>
-    <div class="tag">GİKAL iGEM 2026 • a game for ages 5–6</div>
+    <h1 id="coverTitle">ZipTide<br>and the Golden Zipper</h1>
+    <div class="sub" id="coverSub">A Tale of the Little Guardians 🌟</div>
+    <div class="tag" id="coverTag">GİKAL iGEM 2026 • a game for ages 5–6</div>
     <button class="btn big" id="startBtn">▶ Start</button>
   </div>
 </div>
@@ -231,19 +242,82 @@ function sadTone(){ [400,340,280].forEach((f,i)=>setTimeout(()=>beep(f,.25,'sine
 function zipTick(){ beep(220+Math.random()*120,.05,'square',.12); }
 function tada(){ [523,659,784,1046,1318].forEach((f,i)=>setTimeout(()=>beep(f,.3,'triangle',.24),i*110)); }
 
-/* ============ ANLATIM (okuma) ============ */
+/* ============ DİL / LANGUAGE ============ */
+let lang='en';  // varsayılan İngilizce (iGEM) — düğmeyle TR'ye geçer
+const UI={
+  title:{en:'ZipTide<br>and the Golden Zipper', tr:'ZipTide<br>ve Altın Fermuar'},
+  sub:{en:'A Tale of the Little Guardians 🌟', tr:'Küçük Bekçilerin Masalı 🌟'},
+  tag:{en:'GİKAL iGEM 2026 • a game for ages 5–6', tr:'GİKAL iGEM 2026 • 5–6 yaş için oyun'},
+  start:{en:'▶ Start', tr:'▶ Başla'},
+  listen:{en:'🔊 Listen', tr:'🔊 Dinle'},
+  next:{en:'Next ▶', tr:'İleri ▶'},
+  replay:{en:'🔄 Play Again', tr:'🔄 Yeniden Oyna'},
+  goodThings:{en:'Good things', tr:'Güzel şeyler'},
+  gotAll:{en:'💚 Great! You got them all!', tr:'💚 Harika! Hepsini aldın!'},
+  zipClosed:{en:'Zipper closed! 🎉', tr:'Fermuar kapandı! 🎉'},
+  wellDone:{en:'🌟 Well done! 🌟', tr:'🌟 Aferin! 🌟'},
+};
+
+/* ============ SESLİ ANLATIM (Alya'nın kaydı + yedek TTS) ============ */
+/* Kendi kendine yeten sürümde build script AUDIODATA'yı data-URI'lerle doldurur;
+   repo sürümünde boş kalır ve göreli audio/ yolları kullanılır. */
+const AUDIODATA={};
+function audioSrc(key){ return AUDIODATA[key] || ('audio/'+key+'.mp3'); }
+const audioCache={};
+function getAudio(key){
+  if(!audioCache[key]){ const a=new Audio(); a.preload='auto'; a.src=audioSrc(key); audioCache[key]=a; }
+  return audioCache[key];
+}
+let curAudio=null, playGen=0;
+function stopAudio(){ playGen++; if(curAudio){ try{curAudio.pause();}catch(e){} curAudio.onended=null; curAudio.onerror=null; } curAudio=null; }
+
+/* Bir sahneyi seslendir: [intro, cmd] sırayla. Ses yüklenemezse o parçayı TTS ile oku. */
+function narrate(sceneN){
+  const keys=['s'+sceneN+'_'+lang+'_intro','s'+sceneN+'_'+lang+'_cmd'];
+  const d=scenesData[sceneN-1];
+  const fallback=[d.text[lang], d.task[lang]];
+  playKeys(keys, fallback);
+}
+function playKeys(keys, fallbackTexts){
+  stopAudio(); if(muted) return;
+  const gen=playGen; let i=0;
+  const step=()=>{
+    if(gen!==playGen) return;
+    if(i>=keys.length){ curAudio=null; return; }
+    const a=getAudio(keys[i]);
+    let handled=false;
+    // onended/onerror/play().catch tek parça için yalnızca bir kez ilerlesin
+    const done=(useFallback)=>{
+      if(handled||gen!==playGen) return; handled=true;
+      a.onended=null; a.onerror=null;
+      const nx=()=>{ i++; step(); };
+      if(useFallback) speakText(fallbackTexts&&fallbackTexts[i], nx); else nx();
+    };
+    a.onended=()=>done(false);
+    a.onerror=()=>done(true);
+    curAudio=a;
+    try{a.currentTime=0;}catch(e){}
+    const pr=a.play();
+    if(pr&&pr.catch) pr.catch(()=>done(true));
+  };
+  step();
+}
+
+/* Yedek: tarayıcı TTS'i (ses dosyası çalışmazsa) */
 let ttsOn=true, voices=[];
 function loadVoices(){ voices=speechSynthesis.getVoices(); }
 if('speechSynthesis' in window){ loadVoices(); speechSynthesis.onvoiceschanged=loadVoices; }
-function speak(text){
-  if(muted||!ttsOn||!('speechSynthesis' in window)) return;
+function speakText(text, onend){
+  if(!text||muted||!ttsOn||!('speechSynthesis' in window)){ onend&&onend(); return; }
   speechSynthesis.cancel();
   const u=new SpeechSynthesisUtterance(text);
-  u.lang='en-US'; u.rate=.9; u.pitch=1.08;
-  const en=voices.find(v=>v.lang&&v.lang.toLowerCase().startsWith('en')); if(en)u.voice=en;
+  u.lang= lang==='tr'?'tr-TR':'en-US'; u.rate=.9; u.pitch=1.08;
+  const v=voices.find(x=>x.lang&&x.lang.toLowerCase().startsWith(lang)); if(v)u.voice=v;
+  if(onend) u.onend=onend;
   speechSynthesis.speak(u);
 }
 function stopSpeak(){ if('speechSynthesis' in window) speechSynthesis.cancel(); }
+function stopAll(){ stopAudio(); stopSpeak(); }
 
 /* ============ DURUM ============ */
 let stars=0;
@@ -271,30 +345,48 @@ function tap(el,fn){
 
 /* ============ SAHNELER ============ */
 const scenesData=[
-  {n:1,img:'scene1',badge:'1 • A Peaceful World',
-   text:'On the edge of a tiny world lived little guardians. They stood side by side and held on to each other tightly. A golden zipper ran between them.',
-   task:'👆 Tap the guardians to say hello!'},
-  {n:2,img:'scene2',badge:'2 • The Guardians\' Job',
-   text:'The guardians opened the zipper just the right amount. They let in only good things: cool water drops and tiny crumbs of food.',
-   task:'💧 Tap the good things to let them in! (Don\'t tap the dark things)'},
-  {n:3,img:'scene3',badge:'3 • Curious Zonulin',
-   text:'One day Zonulin came along. It was not mean, just very curious. "What if I pull this zipper open a little more?" it thought, and began to open the zipper.',
-   task:'👆 Tap the Zonulin cloud and see what it does!'},
-  {n:4,img:'scene4',badge:'4 • Everything in a Mess',
-   text:'When the zipper opened, dark things rushed inside. The world\'s colors faded away. The guardians were so sad: "If only someone could help us!"',
-   task:'❤️ Tap the sad guardians to comfort them!'},
-  {n:5,img:'scene5',badge:'5 • A Hero Is Born',
-   text:'In a faraway workshop, hands of light patiently built a little hero, made just to mend that zipper. They named it ZipTide.',
-   task:'✨ Tap the glowing pieces to finish the hero!'},
-  {n:6,img:'scene6',badge:'6 • Help Arrives',
-   text:'ZipTide set off right away. In one hand a little zipper pull, on its face a sweet smile. The air grew warm and the darkness began to fade.',
-   task:'👋 Tap ZipTide to say hi!'},
-  {n:7,img:'scene7',badge:'7 • Gentle Repair',
-   text:'ZipTide did not fight. It leaned in gently and closed the zipper slowly, tooth by tooth, with patience. Mending is much stronger than breaking!',
-   task:'✋ Grab the golden pull and drag it RIGHT — close the zipper!'},
-  {n:8,img:'scene8',badge:'8 • Peace Again',
-   text:'The little world lit up again. The zipper closed from end to end, and only good things drifted in. A sweet peace settled over everything.',
-   task:'🎉 Well done! You became a little guardian hero!'},
+  {n:1,img:'scene1',
+   badge:{en:'1 • A Peaceful World', tr:'1 • Huzurlu Dünya'},
+   text:{en:'On the edge of a tiny little world lived tiny guards. They stood side by side, holding tightly onto one another. Between them ran a golden zipper.',
+         tr:'Minik bir dünyanın kıyısında minik bekçiler yaşarmış. Yan yana dizilir, birbirlerine sımsıkı tutunurlarmış. Aralarından altın bir fermuar geçermiş.'},
+   task:{en:'👆 Tap the guards so they greet you!', tr:'👆 Bekçilere dokun, seni selamlasınlar!'}},
+  {n:2,img:'scene2',
+   badge:{en:'2 • The Guards’ Job', tr:'2 • Bekçilerin Görevi'},
+   text:{en:'The guards would open the zipper only as much as needed. They wanted only good things to pass through: cool drops of water and tiny crumbs of food.',
+         tr:'Bekçiler fermuarı yalnızca gerektiği kadar aralarmış. İçeri sadece güzel şeyler girsin istermiş: serin su damlaları ve minik yiyecek kırıntıları.'},
+   task:{en:'💧 Tap the good things to let them inside! (Don’t touch the dark stuff.)',
+         tr:'💧 Güzel şeylere dokun, içeri girsinler! (Kara şeylere dokunma.)'}},
+  {n:3,img:'scene3',
+   badge:{en:'3 • Curious Zonulin', tr:'3 • Meraklı Zonulin'},
+   text:{en:'One day, Zonulin came by. It had no ill intentions — just curiosity. “What if I pull this zipper open just a little more?” it wondered, and began to tug it apart.',
+         tr:'Bir gün Zonulin çıkagelmiş. Kötü niyeti yokmuş, sadece meraklıymış. “Şu fermuarı birazcık daha çeksem ne olur?” diye merak etmiş ve fermuarı aralamaya başlamış.'},
+   task:{en:'👆 Tap the Zonulin cloud and see what it does!', tr:'👆 Zonulin bulutuna dokun, bakalım ne yapıyor!'}},
+  {n:4,img:'scene4',
+   badge:{en:'4 • Everything in a Mess', tr:'4 • Karışan Düzen'},
+   text:{en:'As the zipper opened, dark things came rushing inside. The little world’s colors began to fade. The guards felt so sad. “If only someone could come help us!”',
+         tr:'Fermuar açılınca kara şeyler içeri doluvermiş. Küçük dünyanın renkleri solmaya başlamış. Bekçiler çok üzülmüş. “Keşke biri gelip bize yardım etse!”'},
+   task:{en:'❤️ Tap the sad guards and pet them!', tr:'❤️ Üzgün bekçilere dokun, onları sev!'}},
+  {n:5,img:'scene5',
+   badge:{en:'5 • A Hero Is Born', tr:'5 • Bir Kahraman Doğuyor'},
+   text:{en:'Far away, in a little workshop, hands made of light were patiently crafting a tiny hero — one who could mend the zipper. They named the hero ZipTide.',
+         tr:'Çok uzaklarda, küçük bir atölyede ışıktan eller sabırla minik bir kahraman yapıyormuş; fermuarı onarabilecek bir kahraman. Adını ZipTide koymuşlar.'},
+   task:{en:'✨ Tap the glowing pieces to complete the hero!', tr:'✨ Parlayan parçalara dokun, kahramanı tamamla!'}},
+  {n:6,img:'scene6',
+   badge:{en:'6 • Help Arrives', tr:'6 • Yardım Yetişiyor'},
+   text:{en:'ZipTide set off at once. With a tiny zipper pull in one hand and a warm smile on its face, it went on its way. The air grew warmer, and the darkness began to disperse.',
+         tr:'ZipTide hemen yola koyulmuş. Bir elinde minik bir fermuar çekmesi, yüzünde sıcak bir gülümsemeyle yola çıkmış. Hava ısınmış, karanlık dağılmaya başlamış.'},
+   task:{en:'👋 Tap ZipTide and say hello!', tr:'👋 ZipTide’a dokun, merhaba de!'}},
+  {n:7,img:'scene7',
+   badge:{en:'7 • Gentle Repair', tr:'7 • Usul Usul Onarım'},
+   text:{en:'ZipTide didn’t fight or force anything. It simply knelt down and gently closed the zipper, one tiny tooth at a time, with patience and care. After all, repairing is far stronger than breaking.',
+         tr:'ZipTide ne kavga etmiş ne de zorlamış. Usulca eğilmiş, fermuarı sabırla ve özenle diş diş kapatmış. Ne de olsa onarmak, yıkmaktan çok daha güçlüymüş.'},
+   task:{en:'✋ Grab the golden zipper pull and drag it RIGHT to close the zipper!',
+         tr:'✋ Altın fermuar çekmesini tut ve SAĞA sürükle, fermuarı kapat!'}},
+  {n:8,img:'scene8',
+   badge:{en:'8 • Peace Again', tr:'8 • Yeniden Huzur'},
+   text:{en:'The little world sparkled once more. The zipper was closed from end to end, and only good things could gently drift inside again. A sweet, peaceful calm settled over everything.',
+         tr:'Küçük dünya yeniden ışıldamış. Fermuar baştan sona kapanmış, içeri gene yalnızca güzel şeyler süzülüyormuş. Her yeri tatlı, huzurlu bir sükûnet kaplamış.'},
+   task:{en:'🎉 Good job, you became a little guardian hero!', tr:'🎉 Aferin, minik bir bekçi kahraman oldun!'}},
 ];
 
 let cur=0; const scenesEl=document.getElementById('scenes'); const sceneNodes=[];
@@ -304,30 +396,51 @@ function buildScene(d){
   s.className='scene'; s.style.backgroundImage=`url('img/${d.img}.jpg')`;
   s.dataset.n=d.n;
   const narr=document.createElement('div'); narr.className='narr';
-  narr.innerHTML=`<div class="badge">${d.badge}</div>
-    <div class="task">${d.task}</div>
-    <p>${d.text}</p>
+  narr.innerHTML=`<div class="badge">${d.badge[lang]}</div>
+    <div class="task">${d.task[lang]}</div>
+    <p>${d.text[lang]}</p>
     <div class="row">
-      <button class="btn listen">🔊 Listen</button>
-      <button class="btn next disabled">Next ▶</button>
+      <button class="btn listen">${UI.listen[lang]}</button>
+      <button class="btn next disabled">${UI.next[lang]}</button>
     </div>`;
   s.appendChild(narr);
-  narr.querySelector('.listen').onclick=()=>{beep(660,.1);speak(d.task.replace(/[^\w\s!?.,']/g,'')+' '+d.text);};
+  narr.querySelector('.listen').onclick=()=>{ beep(660,.1); narrate(d.n); };
   narr.querySelector('.next').onclick=()=>{beep(720,.12,'triangle');go(cur+1);};
   scenesEl.appendChild(s); sceneNodes.push(s);
   return s;
 }
 scenesData.forEach(buildScene);
 
+/* Tüm görünen metinleri seçili dile göre güncelle */
+function applyLang(){
+  document.getElementById('coverTitle').innerHTML=UI.title[lang];
+  document.getElementById('coverSub').textContent=UI.sub[lang];
+  document.getElementById('coverTag').textContent=UI.tag[lang];
+  document.getElementById('startBtn').textContent=UI.start[lang];
+  document.getElementById('langBtn').textContent= lang==='en'?'🇹🇷 TR':'🇬🇧 EN';
+  document.documentElement.lang=lang;
+  sceneNodes.forEach((sn,idx)=>{
+    const d=scenesData[idx];
+    sn.querySelector('.badge').textContent=d.badge[lang];
+    sn.querySelector('.task').textContent=d.task[lang];
+    sn.querySelector('.narr p').textContent=d.text[lang];
+    const li=sn.querySelector('.listen'); if(li) li.textContent=UI.listen[lang];
+    const nx=sn.querySelector('.next:not(.replay)'); if(nx) nx.textContent=UI.next[lang];
+    const rp=sn.querySelector('.replay'); if(rp) rp.textContent=UI.replay[lang];
+    const cm=sn.querySelector('.center-msg h1'); if(cm && cm.dataset.k) cm.textContent=UI[cm.dataset.k][lang];
+    if(sn._refreshLang) sn._refreshLang();
+  });
+}
+
 function enableNext(sn){ const b=sn.querySelector('.next'); b.classList.remove('disabled'); b.style.animation='glow 1s ease-in-out infinite'; }
 
 function go(i){
-  stopSpeak();
+  stopAll();
   if(i>=scenesData.length){ finale(); return; }
   sceneNodes.forEach(n=>n.classList.remove('active'));
   const sn=sceneNodes[i]; sn.classList.add('active'); cur=i;
   const d=scenesData[i];
-  setTimeout(()=>speak(d.text),450);
+  setTimeout(()=>narrate(d.n),450);
   initInteraction(i,sn);
 }
 
@@ -374,8 +487,9 @@ function sceneSort(sn){
   const good=['💧','🍞','🍎','🫐','🥕']; const bad=['🦠','💩','🌫️'];
   let collected=0, need=4, alive=true;
   const goalNode=document.createElement('div'); goalNode.className='item'; goalNode.style.cssText='left:50%;top:16%;transform:translateX(-50%);font-size:clamp(14px,2.4vh,20px);background:rgba(255,255,255,.9);padding:6px 14px;border-radius:16px;font-weight:bold;color:var(--teal-d);cursor:default;z-index:7';
-  const upd=()=>goalNode.textContent=`💧 Good things: ${collected}/${need}`;
+  const upd=()=>goalNode.textContent=`💧 ${UI.goodThings[lang]}: ${collected}/${need}`;
   upd(); sn.appendChild(goalNode);
+  sn._refreshLang=()=>{ if(collected<need) upd(); else goalNode.textContent=UI.gotAll[lang]; };
   const spawn=()=>{
     if(!alive) return;
     const isGood=Math.random()<.62;
@@ -397,7 +511,7 @@ function sceneSort(sn){
         it.style.transition='transform .3s,opacity .3s';it.style.transform='scale(0) translateY(-40px)';it.style.opacity=0;
         collected++; upd();
         if(collected>=need){ alive=false; addStar(); sn.dataset.done='1'; enableNext(sn); chime();
-          goalNode.textContent='💚 Great! You got them all!'; }
+          goalNode.textContent=UI.gotAll[lang]; }
       }else{
         beep(160,.2,'sawtooth',.18); sparkleAt(p.x,p.y,'🚫');
         it.style.transition='transform .25s,opacity .25s';it.style.transform='rotate(20deg)';it.style.opacity=0;
@@ -523,7 +637,7 @@ function sceneRepair(sn){
     sn.dataset.done='1'; addStar(2); chime();
     open.style.display='none';
     const msg=document.createElement('div'); msg.className='center-msg';
-    msg.innerHTML='<h1>Zipper closed! 🎉</h1>'; sn.appendChild(msg);
+    msg.innerHTML=`<h1 data-k="zipClosed">${UI.zipClosed[lang]}</h1>`; sn.appendChild(msg);
     enableNext(sn);
     burstConfetti(sn,30);
   }
@@ -537,14 +651,14 @@ function sparkleAtPct(sn,xp,yp,em){
 function celebrate(sn){
   tada(); burstConfetti(sn,50);
   const msg=document.createElement('div'); msg.className='center-msg';
-  msg.innerHTML=`<h1>🌟 Well done! 🌟</h1>`;
+  msg.innerHTML=`<h1 data-k="wellDone">${UI.wellDone[lang]}</h1>`;
   msg.style.top='6%'; msg.style.justifyContent='flex-start'; msg.style.paddingTop='6%';
   sn.appendChild(msg);
   // replay button — anlatım kartındaki buton satırına ekle (metni örtmesin)
   const nb=sn.querySelector('.next'); if(nb) nb.style.display='none';
   const row=sn.querySelector('.narr .row');
   if(row && !row.querySelector('.replay')){
-    const rp=document.createElement('button'); rp.className='btn next replay'; rp.textContent='🔄 Play Again';
+    const rp=document.createElement('button'); rp.className='btn next replay'; rp.textContent=UI.replay[lang];
     rp.style.animation='glow 1s ease-in-out infinite';
     rp.onclick=()=>{ location.reload(); };
     row.appendChild(rp);
@@ -580,8 +694,17 @@ document.getElementById('startBtn').onclick=()=>{
 };
 document.getElementById('muteBtn').onclick=function(){
   muted=!muted; ttsOn=!muted; this.textContent=muted?'🔇':'🔊';
-  if(muted)stopSpeak(); else beep(660,.12);
+  if(muted)stopAll(); else beep(660,.12);
 };
+/* Dil değiştir: metinleri güncelle ve aktif sahneyi yeni dilde yeniden seslendir */
+document.getElementById('langBtn').onclick=function(){
+  lang = lang==='en'?'tr':'en';
+  beep(700,.1,'triangle');
+  applyLang();
+  const started=document.getElementById('start').style.display==='none';
+  if(started){ const sn=sceneNodes[cur]; if(sn) narrate(scenesData[cur].n); }
+};
+applyLang();  // başlangıç dilini uygula (varsayılan EN)
 // ekran döndürme / boyut değişince fermuar yeniden çizilsin
 window.addEventListener('resize',()=>{ const sn=sceneNodes[cur]; if(sn&&sn.querySelector('#pull')){ /* render tekrar */ } });
 </script>
